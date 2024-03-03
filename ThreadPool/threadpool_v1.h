@@ -38,6 +38,10 @@ public:
     template<class F, class... Args>
     auto commit_task(F&& f, Args&&... args) -> std::future<decltype(f(args...))>
     {
+        if (stop_) {
+            throw std::runtime_error("commit task on stopped ThreadPool.");
+        }
+        
         using return_type = decltype(f(args...));
         // using return_type = decltype(std::forward<F>(f)(std::forward<Args>(args)...));
         auto task = std::make_shared<std::packaged_task<return_type()>>(
@@ -47,9 +51,6 @@ public:
 
         {
             std::unique_lock<std::mutex> locker(mtx_);
-            if (stop_) {
-                throw std::runtime_error("commit task on stopped ThreadPool.");
-            }
             tasks_.emplace([task]() {
                 (*task)();
             });
