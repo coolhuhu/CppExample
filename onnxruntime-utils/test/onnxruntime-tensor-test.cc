@@ -20,18 +20,32 @@ bool CheckEqual(const T *left, size_t left_n, const T *right, size_t right_n) {
 }
 
 template <typename T>
+void PrintVector(const std::vector<T> &data) {
+  for (auto v : data) {
+    std::cout << v << " ";
+  }
+  std::cout << std::endl;
+}
+
+template <typename T>
 bool CheckEqual(const std::vector<T> &left, const std::vector<T> &right) {
   return CheckEqual(left.data(), left.size(), right.data(), right.size());
 }
 
+// 如何有效的测试 Repeat 函数？
+// 一个方法是，使用 torch 构造输入， torch.repeat 构造输出，然后将输入和输出的
+// tensor 以 nunmy 的形式写成文件，这样就有了正确的测试输入和输出；然后借助
+// cnpy(https://github.com/rogersce/cnpy) 读取 tensor，最后调用函数进行测试。
 void TestRepeat() {
+  std::cout << "TestRepeat start..." << std::endl;
+
   std::vector<float> tensor{1, 3, 4, 2, 5, 6};
   std::vector<int64_t> shape{2, 3};
 
   std::vector<int64_t> repeat_factors_1{1, 3};
   std::vector<int64_t> repeat_factors_2{3, 1};
   std::vector<int64_t> repeat_factors_3{1, 1};
-  std::vector<int64_t> repeat_factors_4{2, 3};
+  std::vector<int64_t> repeat_factors_4{2, 1};
 
   std::vector<int64_t> output_shape_1{2, 9};
   std::vector<float> output_tensor_1{1, 3, 4, 1, 3, 4, 1, 3, 4,
@@ -44,10 +58,8 @@ void TestRepeat() {
   std::vector<int64_t> output_shape_3{2, 3};
   std::vector<float> output_tensor_3{1, 3, 4, 2, 5, 6};
 
-  std::vector<int64_t> output_shape_4{4, 9};
-  std::vector<float> output_tensor_4{1, 3, 4, 1, 3, 4, 1, 3, 4, 2, 5, 6,
-                                     2, 5, 6, 2, 5, 6, 1, 3, 4, 1, 3, 4,
-                                     1, 3, 4, 2, 5, 6, 2, 5, 6, 2, 5, 6};
+  std::vector<int64_t> output_shape_4{4, 3};
+  std::vector<float> output_tensor_4{1, 3, 4, 2, 5, 6, 1, 3, 4, 2, 5, 6};
 
   auto output_1 = Repeat(tensor, shape, repeat_factors_1);
   CheckEqual(output_1.second, output_shape_1);
@@ -69,6 +81,8 @@ void TestRepeat() {
 }
 
 void TestUnsqueeze() {
+  std::cout << "TestUnsqueeze start..." << std::endl;
+
   std::vector<int64_t> shape{2, 4, 2, 6};
 
   std::vector<int64_t> output_shape_1{1, 2, 4, 2, 6};
@@ -110,6 +124,8 @@ void TestUnsqueeze() {
 }
 
 void TestView() {
+  std::cout << "TestView start..." << std::endl;
+
   std::vector<float> values = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
   std::vector<int64_t> shape = {2, 3, 2};
   Ort::MemoryInfo memory_info =
@@ -142,6 +158,8 @@ void TestView() {
 }
 
 void TestOrtValueRepeat() {
+  std::cout << "TestOrtValueRepeat start..." << std::endl;
+
   std::vector<float> tensor{1, 3, 4, 2, 5, 6};
   std::vector<int64_t> shape{2, 3};
 
@@ -175,9 +193,30 @@ void TestOrtValueRepeat() {
   std::cout << "TestOrtValueRepeat passed!" << std::endl;
 }
 
+void TestTopK() {
+  std::cout << "TestTopK started..." << std::endl;
+  std::vector<int> values{9, 1, 2, 7, 8, 5, 6, 4, 3, 0};
+  int k = 3;
+
+  auto topk_value_and_indices = TopK(values, k);
+  std::vector<int> top_k{9, 8, 7};
+  std::vector<int> top_k_index{0, 4, 3};
+  CheckEqual(topk_value_and_indices.first, top_k);
+  CheckEqual(topk_value_and_indices.second, top_k_index);
+
+  topk_value_and_indices = TopK(values.data() + 3, 7, k);
+  top_k = std::vector<int>{8, 7, 6};
+  top_k_index = std::vector<int>{1, 0, 3};
+  CheckEqual(topk_value_and_indices.first, top_k);
+  CheckEqual(topk_value_and_indices.second, top_k_index);
+
+  std::cout << "TestTopK passed!" << std::endl;
+}
+
 int main() {
   TestRepeat();
   TestUnsqueeze();
   TestView();
   TestOrtValueRepeat();
+  TestTopK();
 }

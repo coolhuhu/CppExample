@@ -2,6 +2,17 @@
 
 #include <sstream>
 
+/**
+ * @brief Inserts a dimension of size 1 at the specified axis position in the
+ * shape vector
+ *
+ * @param shape Original shape vector
+ * @param axis Axis position to insert new dimension, valid range [0,
+ * shape.size()]
+ * @return std::vector<int64_t> New shape vector containing the inserted
+ * dimension
+ * @throws std::invalid_argument When axis exceeds valid range
+ */
 std::vector<int64_t> Unsqueeze(const std::vector<int64_t> &shape, int axis) {
   if (axis < 0 || axis > shape.size()) {
     std::ostringstream ss;
@@ -24,6 +35,36 @@ std::vector<int64_t> Unsqueeze(const std::vector<int64_t> &shape, int axis) {
 void Unsqueeze(std::vector<int64_t> *shape, int axis) {
   auto new_shape = Unsqueeze(*shape, axis);
   shape->swap(new_shape);
+}
+
+/**
+ * @brief Creates a new tensor with an additional dimension, sharing the same
+ * underlying data buffer
+ *
+ * @param value Pointer to input tensor value
+ * @param axis Axis position to insert new dimension (0-based)
+ * @return Ort::Value New tensor value with expanded shape that shares ownership
+ *         of the underlying data buffer with the original tensor
+ * @note This operation performs a shallow copy - both tensors point to the same
+ * memory buffer. Modifying data through either tensor will affect both
+ * instances.
+ * @throws std::invalid_argument When axis exceeds valid range (handled by
+ * shape-level Unsqueeze)
+ */
+Ort::Value Unsqueeze(Ort::Value *value, int axis) {
+  std::vector<int64_t> shape = value->GetTensorTypeAndShapeInfo().GetShape();
+  std::vector<int64_t> new_shape = Unsqueeze(shape, axis);
+  void *value_data = value->GetTensorMutableRawData();
+  Ort::MemoryInfo memory_info =
+      Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+  size_t element_byte_size = GetTensorElementByteSize(value);
+
+  Ort::Value new_value = Ort::Value::CreateTensor(
+      memory_info, value_data,
+      value->GetTensorTypeAndShapeInfo().GetElementCount() * element_byte_size,
+      new_shape.data(), new_shape.size(),
+      value->GetTensorTypeAndShapeInfo().GetElementType());
+  return new_value;
 }
 
 std::vector<int64_t> ComputeStrides(const int64_t *shape, int shape_size) {

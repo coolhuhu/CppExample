@@ -18,6 +18,8 @@ std::vector<int64_t> Unsqueeze(const std::vector<int64_t> &shape, int axis);
 
 void Unsqueeze(std::vector<int64_t> *shape, int axis);
 
+Ort::Value Unsqueeze(Ort::Value *value, int axis);
+
 Ort::Value View(Ort::Value *value, const std::vector<int64_t> &shape);
 
 Ort::Value View(Ort::Value *value, const int64_t *shape, size_t shape_len);
@@ -26,13 +28,11 @@ std::vector<int64_t> ComputeStrides(const std::vector<int64_t> &shape);
 
 std::vector<int64_t> ComputeStrides(const int64_t *shape, int shape_size);
 
-// NOTE: output and output_shape should have enough memory allocated by the
-// caller.
 template <typename T>
 void Repeat(const T *input, size_t input_size, const int64_t *input_shape,
             size_t input_shape_size, const int64_t *repeat_factors,
             size_t repeat_factors_size, T *output, size_t output_size,
-            int64_t *output_shape, size_t output_shape_size) {
+            const int64_t *output_shape, size_t output_shape_size) {
   if (input_shape_size != repeat_factors_size) {
     throw std::invalid_argument(
         "repeat_factors must match input_shape dimensions.");
@@ -52,38 +52,61 @@ void Repeat(const T *input, size_t input_size, const int64_t *input_shape,
         "output_size.");
   }
 
-  // 3. Compute strides
-  std::vector<int64_t> input_strides =
-      ComputeStrides(input_shape, input_shape_size);
-  std::vector<int64_t> output_strides =
-      ComputeStrides(output_shape, output_shape_size);
+  int number_one_count =
+      std::count(repeat_factors, repeat_factors + repeat_factors_size, 1);
+  if (number_one_count < repeat_factors_size - 1) {
+    throw std::invalid_argument(
+        "repeat_factors must have at most one value other than 1");
+  }
+  if (number_one_count == repeat_factors_size) {
+    std::copy(input, input + input_size, output);
+    return;
+  }
 
-  // 4. Repeat data
-  for (int64_t i = 0; i < output_size; ++i) {
-    // Compute multi-dimensional index in output tensor
-    int64_t rem = i;
-    std::vector<int64_t> out_idx(input_shape_size);
-    for (int64_t d = 0; d < input_shape_size; ++d) {
-      out_idx[d] = rem / output_strides[d];
-      rem %= output_strides[d];
+  auto repeat_value =
+      std::find_if(repeat_factors, repeat_factors + repeat_factors_size,
+                   [](auto x) { return x != 1; });
+  int repeat_value_index = std::distance(repeat_factors, repeat_value);
+
+  int64_t copy_count = std::accumulate(
+      input_shape, input_shape + repeat_value_index, 1, std::multiplies<>());
+  int64_t copyed_element_count =
+      std::accumulate(input_shape + repeat_value_index,
+                      input_shape + input_shape_size, 1, std::multiplies<>());
+
+  int64_t output_first = 0;
+  for (int i = 0; i < copy_count; ++i) {
+    int64_t input_first = i * copyed_element_count;
+    int64_t input_last = (i + 1) * copyed_element_count;
+    for (int j = 0; j < (*repeat_value); ++j) {
+      std::copy(input + input_first, input + input_last, output + output_first);
+      output_first += copyed_element_count;
     }
-
-    // Map to input index using modulo
-    std::vector<int64_t> in_idx(input_shape_size);
-    for (int64_t d = 0; d < input_shape_size; ++d) {
-      in_idx[d] = out_idx[d] % input_shape[d];
-    }
-
-    // Flatten input index
-    int64_t input_offset = 0;
-    for (int64_t d = 0; d < input_shape_size; ++d) {
-      input_offset += in_idx[d] * input_strides[d];
-    }
-
-    output[i] = input[input_offset];
   }
 }
 
+/**
+ * Similar to torch.repeat, but only allows repeating in one dimension.
+ * TODO: Supports repeating in multiple dimensions.
+ *
+ * NOTE: repeat_factors must have at most one value other than 1
+ *
+ * Example:
+ *    input = [1, 3, 4, 2, 5, 6]
+ *    logically: [[1, 3, 4],
+ *                [2, 5, 6]]
+ *    input_shape = (2, 3)
+ *
+ *    repeat_factors = (2, 1)
+ *
+ *    ouput, output_shape = Repeat(input, input_shape, repeat_factors);
+ *    output = [1, 3, 4, 2, 5, 6, 1, 3, 4, 2, 5, 6]
+ *    logically: [[1, 3, 4],
+ *                [2, 5, 6],
+ *                [1, 3, 4],
+ *                [2, 5, 6]]
+ *    output_shape = (4, 3)
+ */
 template <typename T>
 std::pair<std::vector<T>, std::vector<int64_t>> Repeat(
     const std::vector<T> &input, const std::vector<int64_t> &input_shape,
@@ -126,13 +149,10 @@ struct ValueComp {
   }
 };
 
-// We refer the pytorch topk implementation
-// https://github.com/pytorch/pytorch/blob/master/caffe2/operators/top_k.cc
 template <typename T>
-std::pair<std::vector<T>, std::vector<int>> TopK(const std::vector<T> &data,
+std::pair<std::vector<T>, std::vector<int>> TopK(const T *data, int32_t n,
                                                  int32_t k) {
   std::vector<std::pair<T, int32_t>> heap_data;
-  int n = data.size();
   for (int32_t i = 0; i < k && i < n; ++i) {
     heap_data.emplace_back(data[i], i);
   }
@@ -149,7 +169,7 @@ std::pair<std::vector<T>, std::vector<int>> TopK(const std::vector<T> &data,
   std::vector<T> values(std::min(k, n));
   std::vector<int> indices(std::min(k, n));
 
-  int32_t cur = values->size() - 1;
+  int32_t cur = values.size() - 1;
   while (!pq.empty()) {
     const auto &item = pq.top();
     values[cur] = item.first;
@@ -159,6 +179,14 @@ std::pair<std::vector<T>, std::vector<int>> TopK(const std::vector<T> &data,
   }
 
   return std::make_pair(values, indices);
+}
+
+// We refer the pytorch topk implementation
+// https://github.com/pytorch/pytorch/blob/master/caffe2/operators/top_k.cc
+template <typename T>
+std::pair<std::vector<T>, std::vector<int>> TopK(const std::vector<T> &data,
+                                                 int32_t k) {
+  return TopK(data.data(), data.size(), k);
 }
 
 size_t GetTensorElementByteSize(const ONNXTensorElementDataType &data_type);
