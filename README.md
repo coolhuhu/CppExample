@@ -6,3 +6,5 @@
 - MemoryModel：内存模型
 - StringUtil：封装了一些常用的字符串处理函数
 - ThreadPool：线程池
+- onnxruntime-utils: 在使用 onnxruntime 框架进行 onnx 模型推理时，封装的一些常用的工具函数
+- net: 网络编程
