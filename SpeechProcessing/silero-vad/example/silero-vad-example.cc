@@ -347,12 +347,14 @@ class VadIterator {
 };
 
 int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    std::cerr << "Usage: " << argv[0] << " <model> <output.wav>" << std::endl;
+  if (argc != 4) {
+    std::cerr << "Usage: " << argv[0] << " <model> <output.wav> <sample_rate>"
+              << std::endl;
     exit(-1);
   }
   std::string model_path(argv[1]);
   std::string wav_file(argv[2]);
+  int sample_rate = std::stoi(argv[3]);
 
   // Read the WAV file (expects 16000 Hz, mono, PCM).
   wav::WavReader wav_reader(wav_file);  // File located in the "audio" folder.
@@ -363,7 +365,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Initialize the VadIterator.
-  VadIterator vad(model_path);
+  VadIterator vad(model_path, sample_rate);
 
   // Process the audio.
   vad.process(input_wav);
@@ -373,7 +375,7 @@ int main(int argc, char *argv[]) {
 
   // Convert timestamps to seconds and round to one decimal place (for 16000
   // Hz).
-  const float sample_rate_float = 16000.0f;
+  float sample_rate_float = sample_rate;
   for (size_t i = 0; i < stamps.size(); i++) {
     float start_sec =
         std::rint((stamps[i].start / sample_rate_float) * 10.0f) / 10.0f;
