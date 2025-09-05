@@ -1,0 +1,2 @@
+add_executable(multicast_sender sender.cpp)
+add_executable(multicast_receiver receiver.cpp)

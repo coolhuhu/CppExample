@@ -1,0 +1,20 @@
+# Example configuration file for UDP Network Simulator
+# Copy this to config.txt and modify as needed
+
+# Network settings
+listen_host=0.0.0.0
+listen_port=8080
+target_host=127.0.0.1
+target_port=8081
+
+# Network simulation parameters (example values)
+packet_loss_rate=5%
+delay_rate=10%
+jitter_rate=15%
+reorder_rate=5%
+base_delay=50ms
+max_jitter=100ms
+
+# Features
+enable_logging=true
+enable_statistics=true

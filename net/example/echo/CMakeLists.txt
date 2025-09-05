@@ -1,0 +1,6 @@
+add_executable(async_tcp_echo_client async_tcp_echo_client.cc)
+add_executable(async_tcp_echo_server async_tcp_echo_server.cc)
+add_executable(async_udp_echo_server async_udp_echo_server.cc)
+add_executable(blocking_tcp_echo_client blocking_tcp_echo_client.cc)
+add_executable(sync_udp_echo_client sync_udp_echo_client.cc)
+add_executable(sync_udp_echo_server sync_udp_echo_server.cc)

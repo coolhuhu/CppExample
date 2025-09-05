@@ -1,0 +1,2 @@
+add_executable(sync_udp_daytime_client sync_udp_daytime_client.cc)
+add_executable(sync_udp_daytime_server sync_udp_daytime_server.cc)
