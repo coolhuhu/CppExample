@@ -27,7 +27,7 @@ class server {
         asio::buffer(data_, max_length), sender_endpoint_,
         [this](std::error_code ec, std::size_t bytes_recvd) {
           if (!ec && bytes_recvd > 0) {
-            std::cout << "Received: " << bytes_recvd << " bytes\n";
+            // std::cout << "Received: " << bytes_recvd << " bytes\n";
             std::cout << "Received msg: " << std::string(data_, bytes_recvd)
                       << "\n";
             do_send(bytes_recvd);

@@ -2,6 +2,7 @@
 #include <ctime>
 #include <iostream>
 #include <string>
+#include <thread>
 
 using asio::ip::udp;
 
@@ -31,24 +32,13 @@ int main(int argc, char **argv) {
     auto remote_endpoint =
         *resolver.resolve(udp::v4(), remote_address, port).begin();
 
-    std::cout << "input msg: " << std::endl;
-    // 3. 从控制台接收输入的数据
-    std::string msg;
-    while (std::getline(std::cin, msg)) {
-      // 4. 发送数据
-      std::string current_time = make_daytime_string();
-      std::string send_msg = current_time + ": " + msg;
+    for (int i = 0; i < 100; ++i) {
+      std::string send_msg = make_daytime_string();
+      send_msg += ": " + std::to_string(i);
+
       socket.send_to(asio::buffer(send_msg), remote_endpoint);
 
-      // 5. 接收数据
-      std::array<char, 256> recv_buf;
-      udp::endpoint sender_endpoint;
-      size_t len = socket.receive_from(asio::buffer(recv_buf), sender_endpoint);
-
-      int remote_port = sender_endpoint.port();
-      std::cout << "Received from " << remote_address << " " << remote_port
-                << ", reveived msg: " << std::string(recv_buf.data(), len)
-                << std::endl;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
   } catch (std::exception &e) {
